@@ -1,0 +1,133 @@
+# healthcare data related to people with allergies
+
+experimental.group <- c(11,33,48,34,112,369,64,44)
+control.group <- c(177,80,141,332)
+both.groups <- c(11,33,48,34,112,369,64,44,177,80,141,332)
+# histogram of experimental group
+hist(experimental.group)
+# histogram of control group
+hist(control.group)
+# histogram of all data, appears that the data are asymmetric, so I will use
+# difference in medians as the test statistic 
+hist(both.groups)
+
+# set up permutation test 
+library(gtools)
+idx = combinations(n=6, r=3)
+both.groups <- c(11,33,48,34,112,369,64,44,177,80,141,332) # combined data set
+permut = NULL # the permuted data set (a 20*6 matrix)
+for(i in 1:20){
+  permut = rbind(permut, c(both.groups[idx[i,]], both.groups[-idx[i,]]))
+}
+permut.x = permut[, 1:3] # the permuted t1 matrix (20*3)
+permut.y = permut[, 4:6] # the permuted t2 matrix (20*3)
+delta1 = apply(permut.x, 1, median) - apply(permut.y, 1, median)
+# frequency table of permuted D
+table(delta1)
+delta1.obs = median(experimental.group)-median(control.group)
+#pvalue for permutation of sample mean
+pval1.lower = mean(delta1 < delta1.obs) #lower-tailed
+perm.2sample = function(x, y, alternative = c("two.sided", "less", "greater"), stat=c("meandiff", "mediandiff", "trmdiff", "sumX"), trim=0)
+{
+  # exact permutation
+  # test $H_0: delta=mu_x-mu_y=0$ versus $H_a: delta>0 (<0) (\neq 0)
+  # stat="meandiff": difference of means
+  # stat="mediandiff": difference of medians
+  # stat="trmdiff": difference of trimmed means 
+  # trim: the fraction (0 to 0.5) of observations to be trimmed from each end of the data set before the mean is computed. 
+  #stat="sumX": sum of observations from the x group (equivalent with meandiff)
+  
+  m = length(x)
+  n = length(y)
+  N = m+n
+  nperm = choose(N, m)
+  if(nperm>5000){ warning("The number of permutations is over 5000, consider random permutation!")
+    stop()
+  }
+  xy = c(x, y)
+  idx = combinations(n=N, r=m)
+  R = nrow(idx)
+  permut = NULL
+  for(i in 1:R)
+  {
+    permut = rbind(permut, c(xy[idx[i,]], xy[-idx[i,]]))
+  }
+  if(stat=="meandiff") trim=0
+  if(stat %in% c("meandiff", "trmdiff"))
+    D = apply(permut, 1, function(x) mean(x[1:m], trim)-mean(x[-(1:m)], trim))
+  if(stat=="mediandiff")
+    D = apply(permut, 1, function(x) median(x[1:m])-median(x[-(1:m)]))
+  
+  if(stat=="sumX")
+    D = apply(permut, 1, function(x) sum(x[1:m]))
+  
+  if(alternative=="greater")
+    pval = mean(D >= D[1])
+  if(alternative=="less")
+    pval = mean(D <= D[1])
+  if(alternative=="two.sided") 
+    pval = mean(abs(D) >= abs(D[1]))
+  
+  return(list(pval=pval, Dobs=D[1]))
+}
+
+# p-value and test statistic 
+perm.2sample(experimental.group,control.group,alternative = c("less"),
+             stat = c("mediandiff"),trim = 0)
+
+chromium <- c(17.4,17.9,17.6,18.1,17.5,18.9,16.9,17.3,17.8,17.7,24.6,26)
+# sort the data
+sort(chromium)
+
+
+m = length(chromium)
+rank.m = rank(chromium)[1:m]
+
+# test statistic
+W = sum(rank.m)
+W
+# wilcox.test
+wilcox.test(chromium, mu = 0, alternative = "two.sided")
+
+
+#The following R function can be used to set up such a 100(1-alpha)%
+#distribution-free confidence interval on the median:
+
+"conf.med"<-function(x, alpha){
+  v <- sort(x, na.last = NA) #Remove NAs.
+  n <- length(x)
+  if(n > 0) {
+    m <- median(x)
+    l <- qbinom(alpha/2, n, 0.5)+1
+    if(l > 0){
+      u = n-l+1
+      r <- c(m, v[l], v[u])
+    }
+    else r <- c(m, NA, NA)
+  }
+  else r <- c(NA, NA, NA)
+  r <- as.data.frame(list(median = r[1], lower = r[2], upper = r[3]))
+  class(r) <- "table"
+  r
+}
+
+conf.med(chromium, 0.064)
+
+
+allergics <- c(1651,1112,102.4,100,67.6,65.9,64.7,39.6,31)
+nonallergics <- c(48.1,48,45.5,41.7,35.4,34.3,32.4,29.1,27.3,18.9,6.6,5.2,4.7)
+# combine the data in order to find the test statistic 
+both <- c(allergics,nonallergics)
+# sort the combined data
+sort(both)
+#obtain the ranks of Section 1 
+l1 = length(allergics)
+l2 = length(nonallergics)
+rank.allergics = rank(both)[1:l1]
+#rank sum statistic
+W <- sum(rank.allergics)
+W
+# wilcox.test
+allergicranks <- c(7,11,16,17,18,19,20,21,22)
+nonallergicsranks <- c(1,2,3,4,5,6,8,9,10,12,13,14,15)
+wilcox.test(allergicranks,nonallergicsranks,alternative = "greater")
